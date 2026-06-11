@@ -1,0 +1,181 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Default Deny
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() &&
+             ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+              ((request.auth.token.email == "dowites.msf@gmail.com" || request.auth.token.email == "coolnerd008@gmail.com") && request.auth.token.email_verified == true));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function userIdUnchanged() {
+      return !('userId' in request.resource.data) ||
+        request.resource.data.userId == request.auth.uid;
+    }
+    
+    function userIdNotModified() {
+      return !('userId' in request.resource.data) ||
+        request.resource.data.userId == resource.data.userId;
+    }
+    
+    function createdAtNotModified() {
+      return !('createdAt' in request.resource.data) ||
+        !('createdAt' in resource.data) ||
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidOptionalNumber(field, minVal, maxVal) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is number &&
+              request.resource.data[field] >= minVal &&
+              request.resource.data[field] <= maxVal);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidPatientProfile(data) {
+      return hasOnlyAllowedFields(['id', 'userId', 'deviceId', 'name', 'mrn', 'age', 'gender', 'history', 'isArchived', 'personalNotes', 'createdAt', 'updatedAt', 'isEncrypted']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             isValidOptionalString('deviceId', 0, 100) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             isValidOptionalString('mrn', 0, 100) &&
+             isValidOptionalNumber('age', 0, 150) &&
+             (!('gender' in data) || data.gender in ['Male', 'Female']) &&
+             data.history is string && data.history.size() < 800000 &&
+             data.isArchived is bool &&
+             isValidOptionalString('personalNotes', 0, 10000) &&
+             data.createdAt is number &&
+             data.updatedAt is number &&
+             (!('isEncrypted' in data) || data.isEncrypted is bool);
+    }
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['email', 'role', 'institute', 'createdAt']) &&
+             isValidEmail(data.email) &&
+             data.role is string && data.role.size() >= 0 &&
+             data.institute is string && data.institute.size() >= 0 &&
+             data.createdAt is number;
+    }
+
+    function isValidUserUsage(data) {
+      return hasOnlyAllowedFields(['id', 'lastUsageDate', 'dailyCount', 'isPremium', 'associatedAccounts']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.lastUsageDate is string && data.lastUsageDate.size() == 10 &&
+             data.dailyCount is number && data.dailyCount >= 0 &&
+             (!('isPremium' in data) || data.isPremium is bool) &&
+             (!('associatedAccounts' in data) || (data.associatedAccounts is list && data.associatedAccounts.size() <= 20));
+    }
+
+    function isValidBroadcast(data) {
+      return data.keys().hasAll(['id', 'userId', 'userEmail', 'patientName', 'summary', 'createdAt']) &&
+             data.keys().size() <= 7 &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 128 &&
+             data.userId == request.auth.uid &&
+             data.userEmail is string && data.userEmail.size() > 0 && data.userEmail.size() < 256 &&
+             data.patientName is string && data.patientName.size() > 0 && data.patientName.size() < 256 &&
+             data.summary is string && data.summary.size() > 0 && data.summary.size() < 20000 &&
+             data.createdAt is number;
+    }
+
+    function isValidDiscussionMessage(data) {
+      return data.keys().hasAll(['id', 'userId', 'userEmail', 'message', 'timestamp']) &&
+             data.keys().size() == 5 &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 128 &&
+             (data.userId == request.auth.uid || data.userId == 'system') &&
+             data.userEmail is string && data.userEmail.size() > 0 && data.userEmail.size() < 256 &&
+             data.message is string && data.message.size() > 0 && data.message.size() < 5000 &&
+             data.timestamp is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /usage/{id} {
+      allow read: if isOwner(id) || id.matches("^device_.*");
+      allow create: if (isOwner(id) || id.matches("^device_.*")) && isValidUserUsage(request.resource.data);
+      allow update: if (isOwner(id) || id.matches("^device_.*")) && isValidUserUsage(request.resource.data);
+    }
+
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /patients/{patientId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && 
+                    userIdUnchanged() && 
+                    isValidPatientProfile(request.resource.data);
+      allow update: if isDocOwner() && 
+                    userIdNotModified() && 
+                    createdAtNotModified() &&
+                    isValidPatientProfile(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+
+    match /broadcasts/{broadcastId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidBroadcast(request.resource.data);
+      allow update: if isAuthenticated() && isOwner(resource.data.userId) && isValidBroadcast(request.resource.data);
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && isValidDiscussionMessage(request.resource.data);
+      }
+    }
+  }
+}

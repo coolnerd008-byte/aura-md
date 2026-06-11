@@ -1,0 +1,35 @@
+{
+  "name": "AuraMD clinical pilot",
+  "short_name": "AuraMD",
+  "description": "Professional Clinical Assistant & Patient Record Pilot for Physicians",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121417",
+  "theme_color": "#06b6d4",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://picsum.photos/seed/auramd-ui/1280/720",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Professional Dashboard"
+    },
+    {
+      "src": "https://picsum.photos/seed/auramd-mobile/720/1280",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile Clinical Reasoning"
+    }
+  ],
+  "categories": ["medical", "productivity"]
+}

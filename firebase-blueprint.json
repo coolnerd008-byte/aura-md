@@ -1,0 +1,101 @@
+{
+  "entities": {
+    "PatientProfile": {
+      "title": "Patient Profile",
+      "description": "A patient's profile containing their clinical history and details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "The ID of the user who owns this patient profile" },
+        "deviceId": { "type": "string", "description": "Optional device ID for anonymous tracking" },
+        "name": { "type": "string" },
+        "mrn": { "type": "string" },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "enum": ["Male", "Female"] },
+        "history": { 
+          "type": "string", 
+          "description": "JSON stringified array of ClinicalState objects" 
+        },
+        "isArchived": { "type": "boolean" },
+        "personalNotes": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "name", "history", "isArchived", "createdAt", "updatedAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile information.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string" },
+        "institute": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["email", "role", "institute", "createdAt"]
+    },
+    "UserUsage": {
+      "title": "User Usage",
+      "description": "Tracks periodic (weekly/monthly) usage for a user or device to enforce limits.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The tracking ID (userId or deviceId)" },
+        "lastUsageDate": { "type": "string", "description": "ISO date string (YYYY-MM-DD)" },
+        "dailyCount": { "type": "number" },
+        "isPremium": { "type": "boolean" }
+      },
+      "required": ["id", "lastUsageDate", "dailyCount"]
+    },
+    "Broadcast": {
+      "title": "Broadcast",
+      "description": "A patient case shared globally for discussion.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "patientName": { "type": "string" },
+        "summary": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "userEmail", "patientName", "summary", "createdAt"]
+    },
+    "DiscussionMessage": {
+      "title": "Discussion Message",
+      "description": "A message in a global broadcast discussion.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId", "userEmail", "message", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/patients/{patientId}": {
+      "schema": { "$ref": "#/entities/PatientProfile" },
+      "description": "Stores patient profiles for users"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profile information"
+    },
+    "/usage/{id}": {
+      "schema": { "$ref": "#/entities/UserUsage" },
+      "description": "Tracks periodic usage for users or devices"
+    },
+    "/broadcasts/{broadcastId}": {
+      "schema": { "$ref": "#/entities/Broadcast" },
+      "description": "Global broadcasts of clinical cases"
+    },
+    "/broadcasts/{broadcastId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/DiscussionMessage" },
+      "description": "Messages within a global broadcast discussion"
+    }
+  }
+}

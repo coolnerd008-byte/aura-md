@@ -1,0 +1,7 @@
+{
+  "name": "Aura-MD: Ambient Clinical Pilot",
+  "description": "A standalone ambient clinical decision support tool that turns spoken clinical summaries into structured management protocols, starting with DKA.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
