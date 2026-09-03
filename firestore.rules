@@ -20,7 +20,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
              ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-              ((request.auth.token.email == "dowites.msf@gmail.com" || request.auth.token.email == "coolnerd008@gmail.com") && request.auth.token.email_verified == true));
+              (request.auth.token.email == "dowites.msf@gmail.com" || request.auth.token.email == "coolnerd008@gmail.com"));
     }
 
     function isOwner(userId) {
@@ -149,9 +149,9 @@ service cloud.firestore {
       allow update: if (isOwner(id) || id.matches("^device_.*")) && isValidUserUsage(request.resource.data);
     }
 
-    match /settings/{document=**} {
+    match /settings/{documentId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if (documentId == "libraryItems_" + request.auth.uid) || isAdmin();
     }
 
     match /patients/{patientId} {

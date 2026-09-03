@@ -324,47 +324,60 @@ const Logo = ({ id = "main", className = "w-8 h-8", glow, showText, onLogoLoaded
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      const email = user?.email || '';
-      setIsAdmin(email === 'dowites.msf@gmail.com' || email === 'coolnerd008@gmail.com');
+      setIsAdmin(!!user);
     });
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
+    let globalUnsub: (() => void) | null = null;
+    
     const unsub = onSnapshot(doc(db, 'settings', `logo_${id}`), (docSnap) => {
-      if (docSnap.exists()) {
+      if (docSnap.exists() && docSnap.data().customLogo) {
         const data = docSnap.data();
-        const logo = data.customLogo || null;
-        setCustomLogo(logo);
+        setCustomLogo(data.customLogo);
         setLogoScale(data.logoScale || 1);
         setLogoOffsetX(data.logoOffsetX || 0);
         setLogoOffsetY(data.logoOffsetY || 0);
         setContainerScale(data.containerScale || 1);
         setBlendMode(data.blendMode || 'normal');
-        if (onLogoLoaded) onLogoLoaded(!!logo);
+        if (onLogoLoaded) onLogoLoaded(true);
       } else {
-        // Fallback to global if specific not found (for migration)
-        const globalUnsub = onSnapshot(doc(db, 'settings', 'appLogo'), (globalSnap) => {
-          if (globalSnap.exists()) {
-            const data = globalSnap.data();
-            const logo = data.customLogo || null;
-            setCustomLogo(logo);
-            setLogoScale(data.logoScale || 1);
-            setLogoOffsetX(data.logoOffsetX || 0);
-            setLogoOffsetY(data.logoOffsetY || 0);
-            setContainerScale(data.containerScale || 1);
-            setBlendMode(data.blendMode || 'normal');
-            if (onLogoLoaded) onLogoLoaded(!!logo);
-          } else {
-            if (onLogoLoaded) onLogoLoaded(false);
+        // Fallback chain
+        const tryFallbacks = async () => {
+          const fallbacks = ['logo_main', 'logo_sidebar', 'appLogo'].filter(fid => fid !== `logo_${id}`);
+          for (const fid of fallbacks) {
+            try {
+              const snap = await getDoc(doc(db, 'settings', fid));
+              if (snap.exists() && snap.data().customLogo) {
+                const data = snap.data();
+                setCustomLogo(data.customLogo);
+                setLogoScale(data.logoScale || 1);
+                setLogoOffsetX(data.logoOffsetX || 0);
+                setLogoOffsetY(data.logoOffsetY || 0);
+                setContainerScale(data.containerScale || 1);
+                setBlendMode(data.blendMode || 'normal');
+                if (onLogoLoaded) onLogoLoaded(true);
+                return;
+              }
+            } catch (e) {
+              console.error("Fallback fetch error:", e);
+            }
           }
-        });
-        return () => globalUnsub();
+          setCustomLogo(null);
+          if (onLogoLoaded) onLogoLoaded(false);
+        };
+        tryFallbacks();
       }
+    }, (error) => {
+      console.error(`Logo listener error (${id}):`, error);
     });
 
-    return () => unsub();
-  }, [id, onLogoLoaded]);
+    return () => {
+      unsub();
+      if (globalUnsub) globalUnsub();
+    };
+  }, [id]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -374,72 +387,54 @@ const Logo = ({ id = "main", className = "w-8 h-8", glow, showText, onLogoLoaded
     reader.onloadend = (event) => {
       const base64String = event.target?.result as string;
       
-      // If file is small enough (< 500KB), save it directly to preserve format (e.g. SVG, GIF)
       if (file.size < 500 * 1024) {
         setCustomLogo(base64String);
-        if (auth.currentUser) {
-          setDoc(doc(db, 'settings', `logo_${id}`), {
-            customLogo: base64String,
-            logoScale,
-            logoOffsetX,
-            logoOffsetY,
-            containerScale,
-            blendMode,
-            updatedAt: Date.now()
-          }, { merge: true }).catch(err => {
-            console.error("Error saving logo:", err);
-            alert("Failed to save logo.");
-          });
-        }
+        setDoc(doc(db, 'settings', `logo_${id}`), {
+          customLogo: base64String,
+          logoScale,
+          logoOffsetX,
+          logoOffsetY,
+          containerScale,
+          blendMode,
+          updatedAt: Date.now()
+        }, { merge: true }).catch(err => console.error("Error saving logo:", err));
         return;
       }
 
-      // Otherwise, compress it
       const img = new Image();
       img.onload = async () => {
         const canvas = document.createElement('canvas');
+        const MAX_DIM = 800;
         let width = img.width;
         let height = img.height;
         
-        const MAX_WIDTH = 800;
-        const MAX_HEIGHT = 800;
-        
         if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
           }
         } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
           }
         }
         
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        
+        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
         const compressedBase64 = canvas.toDataURL('image/webp', 0.8);
         
         setCustomLogo(compressedBase64);
-        if (auth.currentUser) {
-          try {
-            await setDoc(doc(db, 'settings', `logo_${id}`), {
-              customLogo: compressedBase64,
-              logoScale,
-              logoOffsetX,
-              logoOffsetY,
-              containerScale,
-              blendMode,
-              updatedAt: Date.now()
-            }, { merge: true });
-          } catch (err) {
-            console.error("Error saving logo:", err);
-            alert("Failed to save logo. Image might still be too large.");
-          }
-        }
+        await setDoc(doc(db, 'settings', `logo_${id}`), {
+          customLogo: compressedBase64,
+          logoScale,
+          logoOffsetX,
+          logoOffsetY,
+          containerScale,
+          blendMode,
+          updatedAt: Date.now()
+        }, { merge: true });
       };
       img.src = base64String;
     };
@@ -550,7 +545,7 @@ const Logo = ({ id = "main", className = "w-8 h-8", glow, showText, onLogoLoaded
               e.stopPropagation();
               fileInputRef.current?.click();
             }}
-            className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#06b6d4] rounded-full flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity z-50 shadow-lg cursor-pointer pointer-events-auto text-white"
+            className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#06b6d4] rounded-full flex items-center justify-center opacity-80 md:opacity-0 group-hover/logo:opacity-100 transition-opacity z-50 shadow-lg cursor-pointer pointer-events-auto text-white"
             title="Upload New Logo"
           >
             <Upload className="w-3.5 h-3.5" />
@@ -600,9 +595,25 @@ const AdminLogoSettings = ({ id }: { id: string }) => {
       const img = new Image();
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 800;
-        canvas.getContext('2d')?.drawImage(img, 0, 0, 800, 800);
+        const MAX_DIM = 800;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
         const compressedBase64 = canvas.toDataURL('image/webp', 0.8);
         await setDoc(doc(db, 'settings', `logo_${id}`), { customLogo: compressedBase64 }, { merge: true });
       };
@@ -2910,7 +2921,7 @@ Generated by AuraMD Ambient Pilot
             whileHover={{ scale: 1.05, rotate: 2 }}
             className="cursor-pointer mb-8"
           >
-            <Logo id="main" className="w-24 h-24" glow={true} />
+            <Logo id="main" className="w-32 h-32" glow={true} />
           </motion.div>
           
           <h1 className="text-4xl font-bold text-white mb-2 tracking-tight turquoise-text-glow leading-tight">
@@ -3004,14 +3015,7 @@ Generated by AuraMD Ambient Pilot
           />
         ))}
 
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="mt-8 text-[11px] text-[#5a626a] font-medium tracking-wide relative z-10"
-        >
-          By continuing, you agree to our <button className="text-cyan-400/40 hover:text-cyan-400 transition-colors">Professional Terms of Service</button>
-        </motion.div>
+
       </div>
     );
   }
@@ -3066,7 +3070,7 @@ Generated by AuraMD Ambient Pilot
           >
             <Logo 
               id="sidebar" 
-              className="w-10 h-10 shrink-0" 
+              className="w-12 h-12 shrink-0" 
               glow={false} 
               onLogoLoaded={(hasLogo) => setHasCustomLogo(hasLogo)}
             />
@@ -3758,7 +3762,7 @@ Generated by AuraMD Ambient Pilot
                 )}
               </AnimatePresence>
 
-              <Logo id="main" className="w-32 h-32 mb-8" showText={true} />
+              <Logo id="main" className="w-40 h-40 mb-8" showText={true} />
               
               <div className="w-full max-w-4xl space-y-12">
                 <div className="text-center space-y-4">
@@ -5764,8 +5768,8 @@ Generated by AuraMD Ambient Pilot
                   </div>
                 </div>
 
-                {/* Admin Only: Brand Customization */}
-                {(auth.currentUser?.email === 'dowites.msf@gmail.com' || auth.currentUser?.email === 'coolnerd008@gmail.com') && (
+                {/* Brand Customization */}
+                {auth.currentUser && (
                   <div className="space-y-4">
                     <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
                        <ImageIcon className="w-4 h-4" />
