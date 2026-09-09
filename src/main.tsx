@@ -1,7 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App';
-import { ErrorBoundary } from './ErrorBoundary';
+import ErrorFallback from './ErrorFallback';
 import './index.css';
 
 if (window.location.pathname === '/auth/callback') {
@@ -28,9 +28,9 @@ if (window.location.pathname === '/auth/callback') {
 } else {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <ErrorBoundary>
+      <ErrorFallback>
         <App />
-      </ErrorBoundary>
+      </ErrorFallback>
     </StrictMode>,
   );
 }

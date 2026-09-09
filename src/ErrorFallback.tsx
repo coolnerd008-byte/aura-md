@@ -10,7 +10,7 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+export default class ErrorFallback extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
@@ -47,5 +47,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-export default ErrorBoundary;
