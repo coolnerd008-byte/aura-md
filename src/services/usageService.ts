@@ -10,7 +10,7 @@ export interface UserUsage {
   associatedAccounts?: string[]; // Track unique accounts per device
 }
 
-export const FREE_WEEKLY_LIMIT = 6;
+export const FREE_WEEKLY_LIMIT = 60;
 export const PRO_MONTHLY_LIMIT = 125; // Total analyses per month
 export const MAX_ACCOUNTS_PER_DEVICE = 2; // Strict limit on unique accounts per device for free tier
 

@@ -146,7 +146,7 @@ export const compileTranscript = async (transcript: string): Promise<string> => 
       Analyze this raw clinical transcript (which may be in any language, e.g., English, Urdu, Arabic, French, German, Chinese, etc.):
       "${transcript}"
       
-      Your task is to generate a highly professional, comprehensive, and meticulously structured SOAP note.
+      Your task is to generate a highly professional, clean, and meticulously structured SOAP note from ambient clinical audio or transcriptions.
       
       SOAP NOTE STANDARDS:
       - **Subjective:** Capture the Chief Complaint (CC) in the patient's own words if possible. Detail the History of Present Illness (HPI) using the OPQRST (Onset, Provocation, Quality, Radiation, Severity, Time) or OLD CARTS (Onset, Location, Duration, Character, Aggravating/Alleviating factors, Radiation, Timing, Severity) framework. Include a thorough Review of Systems (ROS), Past Medical History (PMH), Past Surgical History (PSH), Medications (including dosage/frequency if mentioned), Allergies, Social History (SH), and Family History (FH).
@@ -156,13 +156,14 @@ export const compileTranscript = async (transcript: string): Promise<string> => 
 
       CRITICAL INSTRUCTIONS:
       1. TRANSLATE: Translate the entire conversation to professional medical English.
-      2. RETAIN ALL CLINICAL CONTEXT: You MUST catch and include ALL clinical information mentioned in the transcript. Do not miss ANY symptoms, durations, severities, medications, past medical history, social history, family history, allergies, vitals, physical exam findings, patient concerns, or plans. Even if a detail seems minor or is mentioned casually, if it relates to the patient's health, it MUST be in the note.
-      3. FILTER ONLY PURE NOISE: Remove casual greetings ("hello", "how are you"), conversational fillers ("um", "uh"), and completely off-topic chatter (e.g., talking about the weather). DO NOT filter out any patient complaints or doctor observations.
-      4. NO HALLUCINATION: Focus strictly on the information provided in this specific transcript. Do not invent or assume information that isn't explicitly mentioned.
-      5. NO REMARKS: Do not include any introductory or concluding remarks, just the compiled SOAP note starting with the Subjective section.
+      2. RETAIN ALL CLINICAL CONTEXT: You MUST catch and include ALL clinical information mentioned in the transcript.
+      3. AGGRESSIVE NOISE FILTERING: Actively identify and exclude all non-clinical noise, irrelevant side conversations, casual small talk, and repetitive filler. Focus exclusively on medically significant information.
+      4. CLEAN & ON-POINT: Your output must be strictly clinical, professional, and devoid of any non-medical conversational context.
+      5. NO HALLUCINATION: Focus strictly on the information provided in this specific transcript.
+      6. NO REMARKS: Do not include any introductory or concluding remarks.
     `,
     config: {
-      systemInstruction: "You are an elite medical scribe. Your primary job is to generate flawless, comprehensive SOAP notes from ambient dictations. You MUST capture every single clinically relevant detail without exception. Do not summarize away important nuances.",
+      systemInstruction: "You are an elite medical scribe and noise-canceling clinical processor. Your primary job is to generate flawless, clean, and on-point SOAP notes from ambient clinical dictations. You MUST listen carefully to extract every clinically relevant detail while aggressively filtering out noise, irrelevant chatter, and non-medical talk. Your final note must be professional and strictly clinical.",
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
     }
   });
@@ -179,32 +180,32 @@ export const parseAmbientTranscript = async (transcript: string, previousHistory
       Context from previous history (Trend context): "${previousHistory}"
       
       Your task:
-      1. TRANSLATE & RETAIN: The transcript may be in any language or a mix. Translate it internally to English. You MUST completely ignore pure conversational filler, but you MUST NOT drop any clinical details, symptoms, patient concerns, or observations, no matter how casually they are mentioned.
-      2. EXHAUSTIVE EXTRACTION: You MUST catch ALL necessary clinical information mentioned in the transcript. Do not miss any symptoms, durations, severities, medications, past medical history, social history, family history, allergies, or physical exam findings.
-      3. HISTORY NOTE (SOAP FORMAT): Generate a highly professional, comprehensive clinical note in strict SOAP format (Subjective, Objective, Assessment, Plan) for THIS encounter. 
-         - Subjective: Include Chief Complaint (CC), History of Present Illness (HPI) using OPQRST/OLD CARTS, Review of Systems (ROS), Past Medical/Surgical History, Medications, Allergies, Social History, and Family History.
-         - Objective: Include all mentioned Vitals, Physical Exam findings by system, and Lab/Imaging results.
-         - Assessment: Include the primary diagnosis and a prioritized list of differential diagnoses.
-         - Plan: Include all mentioned treatments, medications (dose/route/freq), follow-up instructions, and patient education.
-         Do NOT repeat information from the 'previous history' context unless it is being explicitly discussed or updated in the current transcript.
-      4. DATA EXTRACTION: Extract all provided quantitative and qualitative clinical data (labs, vitals, status, weight, age, gender, patientName). If a patient name is mentioned (e.g., "Patient Joe", "Mr. Smith"), extract it precisely.
-      5. CALCULATE SCORES: Based on available data, calculate relevant scores (Anion Gap, CrCl, etc.).
+      1. TRANSLATE & CLEAN: The transcript may be in any language or a mix. Translate it internally to English. You MUST AGGRESSIVELY FILTER all non-clinical noise, irrelevant talk, small talk, and fillers.
+      2. CLINICAL FOCUS: Listen carefully for specific medical facts, symptoms, patient concerns, or observations. Do not miss any symptoms, durations, severities, medications, past medical history, social history, family history, allergies, or physical exam findings.
+      3. CLEAN SOAP NOTE: Generate a highly professional, comprehensive, and clean clinical note in strict SOAP format (Subjective, Objective, Assessment, Plan) for THIS encounter. 
+         - Subjective: Include Chief Complaint (CC), History of Present Illness (HPI), ROS, PMH, PSH, Meds, Allergies, SH, and FH.
+         - Objective: Include Vitals, Physical Exam findings, and Lab/Imaging results.
+         - Assessment: Include primary diagnosis and prioritized differential diagnoses.
+         - Plan: Include treatments, medications (dose/route/freq), follow-up instructions, and patient education.
+         Do NOT repeat information from the 'previous history' context unless it is explicitly discussed or updated.
+      4. DATA EXTRACTION: Extract all provided quantitative and qualitative clinical data.
+      5. CALCULATE SCORES: Based on available data, calculate relevant scores.
       6. DIRECTIONAL GUIDANCE: Provide a single most important next action.
       7. Identify essential missing data.
-      8. Generate provisional differential diagnoses (even if the input is brief, provide the most likely possibilities based on the symptoms).
+      8. Generate clean provisional differential diagnoses.
       9. Provide a guideline-directed management plan if diagnosis is clear.
-      10. PERFORM ADVERSARIAL ANALYSIS: Act as a clinical devil's advocate. Challenge the most obvious diagnosis.
+      10. PERFORM ADVERSARIAL ANALYSIS: Challenge the most obvious diagnosis.
       11. TREND ASSESSMENT: Compare current findings with previous history.
-      12. SUGGESTED STEPS: Provide 3-5 high-yield next steps for history taking or physical examination that are CRITICAL for the current context.
-      13. TRAJECTORY PREDICTION: Predict what may happen next (e.g., risk of septic shock, AKI) and suggest preventive steps.
+      12. SUGGESTED STEPS: Provide 3-5 high-yield next steps.
+      13. TRAJECTORY PREDICTION: Predict what may happen next.
       14. BLINDSPOT DETECTOR: Review the encounter and flag things physicians might miss.
       15. MULTI-AGENT DEBATE: Simulate multiple AI agents arguing like senior attendings.
-      16. DYNAMIC TIMELINE: Build a living timeline of the patient based on the transcript and history.
+      16. DYNAMIC TIMELINE: Build a living timeline of the patient.
       
-      CRITICAL: You MUST populate all required fields in the JSON response. Do not leave arrays empty unless absolutely necessary. For differentials, always provide at least 2-3 possibilities.
+      CRITICAL: You MUST generate clean, clinical, and on-point SOAP notes while filtering out all irrelevant background noise or non-medical conversation.
     `,
     config: {
-      systemInstruction: "You are an elite medical scribe and clinical reasoning assistant. Your primary job is to generate flawless, comprehensive SOAP notes from ambient dictations. You MUST capture every single clinically relevant detail (symptoms, meds, history, vitals, plans) without exception. Do not summarize away important nuances.",
+      systemInstruction: "You are an elite medical scribe and clinical reasoning assistant with advanced noise-canceling capabilities. Your primary job is to generate flawless, clean, and on-point SOAP notes from ambient clinical dictations. You MUST listen carefully to extract every clinically relevant detail while aggressively filtering out noise, irrelevant chatter, and non-medical talk. Do not summarize away important clinical nuances, but ensure the final note is professional and strictly clinical.",
       responseMimeType: "application/json",
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       responseSchema: {
