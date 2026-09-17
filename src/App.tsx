@@ -1016,7 +1016,6 @@ export default function App() {
   const [isUpgradeProcessing, setIsUpgradeProcessing] = useState(false);
   const [isSavingPatient, setIsSavingPatient] = useState(false);
   const [isClinicalDetailsDropdownOpen, setIsClinicalDetailsDropdownOpen] = useState(false);
-  const [language, setLanguage] = useState('en-US');
   const [isCompiling, setIsCompiling] = useState(false);
   const [reasoningQuery, setReasoningQuery] = useState('');
   const [reasoningImage, setReasoningImage] = useState<string | null>(null);
@@ -2243,10 +2242,14 @@ export default function App() {
   const globalTranscriptRef = useRef('');
   const sessionTranscriptRef = useRef('');
   const interimTranscriptRef = useRef('');
+  const activePatientRef = useRef(activePatient);
+  const isDisguisedRef = useRef(isDisguised);
 
   const handleCompileDictationRef = useRef<(() => Promise<void>) | null>(null);
   useEffect(() => {
     handleCompileDictationRef.current = handleCompileDictation;
+    activePatientRef.current = activePatient;
+    isDisguisedRef.current = isDisguised;
   });
 
   useEffect(() => {
@@ -2267,6 +2270,12 @@ export default function App() {
           }
         }
         
+        // Ensure real-time PII masking before saving to transcript
+        if (isDisguisedRef.current && activePatientRef.current) {
+          finalStr = disguiseText(finalStr, 'text', true, activePatientRef.current);
+          interimStr = disguiseText(interimStr, 'text', true, activePatientRef.current);
+        }
+
         sessionTranscriptRef.current = finalStr;
         interimTranscriptRef.current = interimStr;
         setTranscript(globalTranscriptRef.current + finalStr + interimStr);
@@ -2337,7 +2346,6 @@ export default function App() {
       globalTranscriptRef.current = '';
       sessionTranscriptRef.current = '';
       interimTranscriptRef.current = '';
-      recognitionRef.current.lang = language;
       try {
         recognitionRef.current.start();
       } catch (e) {
@@ -2597,7 +2605,8 @@ export default function App() {
           trajectory: extracted.trajectory,
           blindspots: extracted.blindspots,
           debate: extracted.debate,
-          timeline: extracted.timeline
+          timeline: extracted.timeline,
+          references: extracted.references
         };
 
         let updatedPatientToSave: PatientProfile | undefined;

@@ -160,7 +160,7 @@ export const compileTranscript = async (transcript: string): Promise<string> => 
       2. CLINICAL PRECISION: You MUST catch and include ALL clinical information mentioned. Use standard medical terminology.
       3. AGGRESSIVE NOISE FILTERING: Actively identify and exclude all non-clinical noise, irrelevant side conversations, casual small talk, and repetitive filler. 
       4. JUROR/AUDIENCE FILTERING: If this transcript is from a showcase or demo, AGGRESSIVELY FILTER out questions from jurors, audience comments, or any talk that isn't part of the actual patient-doctor interaction.
-      5. PII MASKING: Do NOT include real names, addresses, or phone numbers in the output. Use [PATIENT NAME], [ADDRESS], etc., if they appear in the transcript.
+      5. PII MASKING: Do NOT include real names, addresses, phone numbers, Social Security Numbers (SSN), Tax Numbers (NTN), or CNIC in the output. Use [PATIENT NAME], [ADDRESS], [PHONE], [ID], or [CNIC] if they appear in the transcript.
       6. CLEAN & ON-POINT: Your output must be strictly clinical.
       7. NO HALLUCINATION: Focus strictly on the information provided.
     `,
