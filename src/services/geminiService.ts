@@ -60,6 +60,7 @@ export interface ExtractedClinicalData {
   blindspots?: ClinicalState['blindspots'];
   debate?: ClinicalState['debate'];
   timeline?: ClinicalState['timeline'];
+  references?: { citation: string; url?: string }[];
 }
 
 export const extractNotesFromImages = async (images: {data: string, mimeType: string}[]): Promise<string> => {
@@ -143,27 +144,28 @@ export const compileTranscript = async (transcript: string): Promise<string> => 
   const response = await getAI().models.generateContent({
     model: "gemini-flash-latest",
     contents: `
-      Analyze this raw clinical transcript (which may be in any language, e.g., English, Urdu, Arabic, French, German, Chinese, etc.):
+      Analyze this raw clinical transcript (which may be in any language, e.g., English, Urdu, Sindhi, Punjabi, Pashto, Arabic, French, German, Chinese, etc.):
       "${transcript}"
       
       Your task is to generate a highly professional, clean, and meticulously structured SOAP note from ambient clinical audio or transcriptions.
       
       SOAP NOTE STANDARDS:
-      - **Subjective:** Capture the Chief Complaint (CC) in the patient's own words if possible. Detail the History of Present Illness (HPI) using the OPQRST (Onset, Provocation, Quality, Radiation, Severity, Time) or OLD CARTS (Onset, Location, Duration, Character, Aggravating/Alleviating factors, Radiation, Timing, Severity) framework. Include a thorough Review of Systems (ROS), Past Medical History (PMH), Past Surgical History (PSH), Medications (including dosage/frequency if mentioned), Allergies, Social History (SH), and Family History (FH).
-      - **Objective:** List all Vital Signs (Temp, HR, RR, BP, SpO2). Document Physical Exam findings by system (HEENT, Cardiovascular, Respiratory, Abdomen, Neurological, Musculoskeletal, Skin). Include any Lab results or Imaging findings mentioned.
-      - **Assessment:** Provide a clear Primary Diagnosis. List Differential Diagnoses (DDx) in order of likelihood, with a brief clinical justification for each.
-      - **Plan:** Detail the diagnostic plan (further tests), therapeutic plan (medications, procedures), patient education/counseling, and follow-up instructions (including "return to ER" criteria).
+      - **Subjective:** Capture the Chief Complaint (CC) in the patient's own words if possible. Detail the History of Present Illness (HPI) with precision (chronology, severity, aggravating/alleviating factors).
+      - **Objective:** List all Vital Signs and Physical Exam findings. Be specific about "observed" vs "reported" findings.
+      - **Assessment:** Provide a clear, evidence-based Primary Diagnosis. List Differential Diagnoses (DDx) with specific clinical justifications based on this transcript.
+      - **Plan:** Detail specific tests, exact medication dosages/frequencies (if mentioned), and follow-ups.
 
       CRITICAL INSTRUCTIONS:
-      1. TRANSLATE: Translate the entire conversation to professional medical English.
-      2. RETAIN ALL CLINICAL CONTEXT: You MUST catch and include ALL clinical information mentioned in the transcript.
-      3. AGGRESSIVE NOISE FILTERING: Actively identify and exclude all non-clinical noise, irrelevant side conversations, casual small talk, and repetitive filler. Focus exclusively on medically significant information.
-      4. CLEAN & ON-POINT: Your output must be strictly clinical, professional, and devoid of any non-medical conversational context.
-      5. NO HALLUCINATION: Focus strictly on the information provided in this specific transcript.
-      6. NO REMARKS: Do not include any introductory or concluding remarks.
+      1. TRANSLATE: Translate the entire conversation to professional medical English. Support regional languages like Urdu, Sindhi, Punjabi, and Pashto.
+      2. CLINICAL PRECISION: You MUST catch and include ALL clinical information mentioned. Use standard medical terminology.
+      3. AGGRESSIVE NOISE FILTERING: Actively identify and exclude all non-clinical noise, irrelevant side conversations, casual small talk, and repetitive filler. 
+      4. JUROR/AUDIENCE FILTERING: If this transcript is from a showcase or demo, AGGRESSIVELY FILTER out questions from jurors, audience comments, or any talk that isn't part of the actual patient-doctor interaction.
+      5. PII MASKING: Do NOT include real names, addresses, or phone numbers in the output. Use [PATIENT NAME], [ADDRESS], etc., if they appear in the transcript.
+      6. CLEAN & ON-POINT: Your output must be strictly clinical.
+      7. NO HALLUCINATION: Focus strictly on the information provided.
     `,
     config: {
-      systemInstruction: "You are an elite medical scribe and noise-canceling clinical processor. Your primary job is to generate flawless, clean, and on-point SOAP notes from ambient clinical dictations. You MUST listen carefully to extract every clinically relevant detail while aggressively filtering out noise, irrelevant chatter, and non-medical talk. Your final note must be professional and strictly clinical.",
+      systemInstruction: "You are an elite medical scribe and noise-canceling clinical processor. You handle multiple languages including Sindhi, Punjabi, and Pashto. Your primary job is to generate flawless, clean, and on-point SOAP notes from ambient clinical dictations, filtering out all noise, juror questions, and irrelevant chatter.",
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
     }
   });
@@ -180,32 +182,30 @@ export const parseAmbientTranscript = async (transcript: string, previousHistory
       Context from previous history (Trend context): "${previousHistory}"
       
       Your task:
-      1. TRANSLATE & CLEAN: The transcript may be in any language or a mix. Translate it internally to English. You MUST AGGRESSIVELY FILTER all non-clinical noise, irrelevant talk, small talk, and fillers.
-      2. CLINICAL FOCUS: Listen carefully for specific medical facts, symptoms, patient concerns, or observations. Do not miss any symptoms, durations, severities, medications, past medical history, social history, family history, allergies, or physical exam findings.
-      3. CLEAN SOAP NOTE: Generate a highly professional, comprehensive, and clean clinical note in strict SOAP format (Subjective, Objective, Assessment, Plan) for THIS encounter. 
-         - Subjective: Include Chief Complaint (CC), History of Present Illness (HPI), ROS, PMH, PSH, Meds, Allergies, SH, and FH.
-         - Objective: Include Vitals, Physical Exam findings, and Lab/Imaging results.
-         - Assessment: Include primary diagnosis and prioritized differential diagnoses.
-         - Plan: Include treatments, medications (dose/route/freq), follow-up instructions, and patient education.
-         Do NOT repeat information from the 'previous history' context unless it is explicitly discussed or updated.
-      4. DATA EXTRACTION: Extract all provided quantitative and qualitative clinical data.
-      5. CALCULATE SCORES: Based on available data, calculate relevant scores.
-      6. DIRECTIONAL GUIDANCE: Provide a single most important next action.
-      7. Identify essential missing data.
-      8. Generate clean provisional differential diagnoses.
-      9. Provide a guideline-directed management plan if diagnosis is clear.
-      10. PERFORM ADVERSARIAL ANALYSIS: Challenge the most obvious diagnosis.
-      11. TREND ASSESSMENT: Compare current findings with previous history.
-      12. SUGGESTED STEPS: Provide 3-5 high-yield next steps.
-      13. TRAJECTORY PREDICTION: Predict what may happen next.
-      14. BLINDSPOT DETECTOR: Review the encounter and flag things physicians might miss.
-      15. MULTI-AGENT DEBATE: Simulate multiple AI agents arguing like senior attendings.
-      16. DYNAMIC TIMELINE: Build a living timeline of the patient.
+      1. TRANSLATE & CLEAN: The transcript may be in any language or a mix (including Urdu, Sindhi, Punjabi, Pashto). Translate it internally to English. You MUST AGGRESSIVELY FILTER all non-clinical noise, juror talk, audience questions, and small talk.
+      2. CLINICAL PRECISION: Listen carefully for specific medical facts. Capture symptoms, durations, severities, and medications with exactness. Use formal medical terminology.
+      3. CLEAN SOAP NOTE: Generate a professional clinical note in SOAP format. Ensure the 'Subjective' section captures the patient's narrative accurately, and the 'Objective' section is strictly data-driven.
+      4. ACCURATE ASSESSMENT: Your assessment must be highly accurate and provide a prioritized list of differentials with clinical justifications based on the evidence in the transcript.
+      5. PII MASKING: AGGRESSIVELY MASK all names, phone numbers, addresses, Social Security Numbers (SSN), Tax Numbers (NTN), and CNIC with placeholders like [PATIENT NAME], [PHONE], [ADDRESS], [ID], [CNIC].
+      5. DATA EXTRACTION: Extract all provided clinical data.
+      6. CALCULATE SCORES: Based on available data, calculate relevant scores.
+      7. DIRECTIONAL GUIDANCE: Provide next actions.
+      8. Identify missing data.
+      9. Generate differentials.
+      10. Guideline-directed management.
+      11. ADVERSARIAL ANALYSIS.
+      12. TREND ASSESSMENT.
+      13. SUGGESTED STEPS.
+      14. TRAJECTORY PREDICTION.
+      15. BLINDSPOT DETECTOR.
+      16. MULTI-AGENT DEBATE.
+      17. DYNAMIC TIMELINE.
+      18. CLINICAL REFERENCES: Provide an array of up to 5 authoritative medical references (citations and optional URLs) that support the assessment, differentials, and management plan generated.
       
-      CRITICAL: You MUST generate clean, clinical, and on-point SOAP notes while filtering out all irrelevant background noise or non-medical conversation.
+      CRITICAL: You MUST generate clean, clinical, and on-point SOAP notes while filtering out all irrelevant background noise, juror comments, or non-medical conversation. Focus on accuracy and specificity.
     `,
     config: {
-      systemInstruction: "You are an elite medical scribe and clinical reasoning assistant with advanced noise-canceling capabilities. Your primary job is to generate flawless, clean, and on-point SOAP notes from ambient clinical dictations. You MUST listen carefully to extract every clinically relevant detail while aggressively filtering out noise, irrelevant chatter, and non-medical talk. Do not summarize away important clinical nuances, but ensure the final note is professional and strictly clinical.",
+      systemInstruction: "You are an elite medical scribe and clinical reasoning assistant handling multiple languages (Urdu, Sindhi, Punjabi, Pashto). Your primary job is to generate flawless, clean, and on-point SOAP notes from ambient clinical dictations. You MUST filter out noise and juror questions, and provide highly specific, accurate, and evidence-based clinical assessments.",
       responseMimeType: "application/json",
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       responseSchema: {
@@ -263,7 +263,7 @@ export const parseAmbientTranscript = async (transcript: string, previousHistory
           age: { type: Type.NUMBER },
           gender: { type: Type.STRING },
           patientName: { type: Type.STRING },
-          historyNote: { type: Type.STRING, description: "A concise clinical note in SOAP format (Subjective, Objective, Assessment, Plan) for the current encounter only, excluding noise and previous history." },
+          historyNote: { type: Type.STRING, description: "A meticulously structured clinical note in SOAP format. The 'Assessment' and 'Plan' sections must be highly specific, evidence-based, and provide clear clinical justifications for every finding and recommendation." },
           scores: {
             type: Type.OBJECT,
             properties: {
@@ -390,9 +390,20 @@ export const parseAmbientTranscript = async (transcript: string, previousHistory
               },
               required: ["time", "event", "type"]
             }
+          },
+          references: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                citation: { type: Type.STRING },
+                url: { type: Type.STRING }
+              },
+              required: ["citation"]
+            }
           }
         },
-        required: ["historyNote", "missingData", "differentials", "provisionalDiagnosis", "directionalQuery", "managementPlan", "adversarialAnalysis", "trendAnalysis", "scores", "suggestedSteps", "trajectory", "blindspots", "debate", "timeline"]
+        required: ["historyNote", "missingData", "differentials", "provisionalDiagnosis", "directionalQuery", "managementPlan", "adversarialAnalysis", "trendAnalysis", "scores", "suggestedSteps", "trajectory", "blindspots", "debate", "timeline", "references"]
       }
     }
   });

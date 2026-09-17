@@ -141,6 +141,7 @@ export interface ClinicalState {
   debate?: AgentDebate;
   timeline?: TimelineEvent[];
   whatIfs?: WhatIfSimulation[];
+  references?: { citation: string; url?: string }[];
 }
 
 export interface PatientProfile {
